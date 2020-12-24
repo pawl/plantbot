@@ -2,6 +2,7 @@
  * moisture sensor for house plants
  *
  * based on:
+ * - https://how2electronics.com/capacitive-soil-moisture-sensor-esp8266-esp32-oled-display/
  * - https://github.com/lucafabbri/HiGrow-Arduino-Esp/blob/aac562fce664ef1c951b2ea9673358189671c310/HiGrowEsp32/HiGrowEsp32.ino
  *
  * parts:
@@ -10,8 +11,6 @@
  */
 #include "arduino_secrets.h"
 #include <WiFi.h>
-#include <ESP.h>
-#include <esp_deep_sleep.h>
 #include <WiFiClientSecure.h>
 #include <UniversalTelegramBot.h>
 
@@ -21,7 +20,10 @@ int DEEPSLEEP_SECONDS = 86400;
 
 uint64_t chipID;
 
-const int SOIL_PIN = 32;
+int SOIL_PIN = 36;
+
+int AIR_VALUE = 4095;
+int WATER_VALUE = 1693; // value when sensor is submerged
 
 const char* ssid = SECRET_SSID;
 const char* wifiPassword = SECRET_PASS;
@@ -36,7 +38,7 @@ UniversalTelegramBot bot(BotToken, client);
 char deviceid[21];
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
   while(!Serial) {
     ; // wait for serial port to connect. Needed for native USB port only
   }
@@ -58,20 +60,19 @@ void setup() {
 }
 
 void sendSensorData(){
+  float soilMoistureValue = analogRead(SOIL_PIN);
+  int moisturePercent = map(soilMoistureValue, AIR_VALUE, WATER_VALUE, 0, 100);
+
+  Serial.print(F("water: "));
+  Serial.print(moisturePercent);
+
+  // create telegram message and send
   char message[1024];
-
-  int soilMoistureValue = analogRead(SOIL_PIN);
-  int moisturePercentage = (100 - ((soilMoistureValue / 1023.00) * 100));
-
-  Serial.print(F("water %: "));
-  Serial.print(moisturePercentage);
-
   strcpy(message, "deviceId: ");
   strcat(message, String(deviceid).c_str());
-  strcat(message, "\nwater %: ");
-  strcat(message, String(moisturePercentage).c_str());
+  strcat(message, "\nwater: ");
+  strcat(message, String(moisturePercent).c_str());
   strcat(message, "%");
-
   bot.sendMessage(chatID, message, "");
 }
 
